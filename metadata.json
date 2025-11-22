@@ -1,0 +1,5 @@
+{
+  "name": "ImagiText",
+  "description": "Convert your images into detailed AI generation prompts in seconds using Gemini 2.5 Flash.",
+  "requestFramePermissions": []
+}
