@@ -9,9 +9,11 @@ import { generatePromptFromImage } from './services/aiService';
 import { AnalysisResult, Language, View } from './types';
 import { translations } from './translations';
 
-// Key for localStorage
+// Keys for localStorage
 const STORAGE_KEY_RESULT = 'imagitext_analysis_result';
 const STORAGE_KEY_IMAGE = 'imagitext_uploaded_image';
+const STORAGE_KEY_THEME = 'imagitext_theme';
+const STORAGE_KEY_LANGUAGE = 'imagitext_language';
 
 // Helper to convert File to Base64 for storage
 const fileToBase64 = (file: File): Promise<string> => {
@@ -23,14 +25,40 @@ const fileToBase64 = (file: File): Promise<string> => {
   });
 };
 
+// Detect system color scheme preference
+const getSystemTheme = (): boolean => {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  }
+  return false; // Default to light if detection not available
+};
+
+// Get initial theme from localStorage or system preference
+const getInitialTheme = (): boolean => {
+  const savedTheme = localStorage.getItem(STORAGE_KEY_THEME);
+  if (savedTheme !== null) {
+    return savedTheme === 'dark';
+  }
+  return getSystemTheme();
+};
+
+// Get initial language from localStorage or default to Chinese
+const getInitialLanguage = (): Language => {
+  const savedLang = localStorage.getItem(STORAGE_KEY_LANGUAGE);
+  if (savedLang === 'en' || savedLang === 'zh') {
+    return savedLang;
+  }
+  return 'zh'; // Default to Chinese
+};
+
 function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [promptResult, setPromptResult] = useState<AnalysisResult | null>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [savedImageUrl, setSavedImageUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(false);
-  const [lang, setLang] = useState<Language>('zh');
+  const [isDark, setIsDark] = useState(getInitialTheme);
+  const [lang, setLang] = useState<Language>(getInitialLanguage);
   
   // Navigation State
   const [currentView, setCurrentView] = useState<View>('image-to-prompt');
@@ -74,11 +102,15 @@ function App() {
   }, [isDark]);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
+    const newTheme = !isDark;
+    setIsDark(newTheme);
+    localStorage.setItem(STORAGE_KEY_THEME, newTheme ? 'dark' : 'light');
   };
 
   const toggleLang = () => {
-    setLang(prev => prev === 'zh' ? 'en' : 'zh');
+    const newLang = lang === 'zh' ? 'en' : 'zh';
+    setLang(newLang);
+    localStorage.setItem(STORAGE_KEY_LANGUAGE, newLang);
   };
 
   const handleFileSelect = async (file: File) => {

@@ -25,11 +25,14 @@ const getEnv = (key: string): string | undefined => {
 
 // Configuration interface
 interface AIConfig {
+  // Image Analysis (Image to Prompt) Config
   provider: string;
   apiKey: string | undefined;
   baseUrl: string | undefined;
   model: string | undefined;
-  // Specific config for Image Generation
+
+  // Image Generation (AI Painting) Config - Completely Separate
+  imgGenProvider: string;
   imgGenApiKey: string | undefined;
   imgGenBaseUrl: string | undefined;
   imgGenModel: string | undefined;
@@ -37,12 +40,14 @@ interface AIConfig {
 
 // Load config
 const config: AIConfig = {
+  // Image Analysis Config (Image to Prompt)
   provider: (getEnv('AI_PROVIDER') || 'gemini').toLowerCase(),
-  apiKey: getEnv('API_KEY'), 
+  apiKey: getEnv('API_KEY'),
   baseUrl: getEnv('AI_BASE_URL'),
   model: getEnv('AI_MODEL'),
-  
-  // Image Gen Specifics (Fallback to main config if not set)
+
+  // Image Generation Config (AI Painting) - Completely Separate
+  imgGenProvider: (getEnv('IMG_GEN_PROVIDER') || getEnv('AI_PROVIDER') || 'gemini').toLowerCase(),
   imgGenApiKey: getEnv('IMG_GEN_API_KEY') || getEnv('API_KEY'),
   imgGenBaseUrl: getEnv('IMG_GEN_BASE_URL') || getEnv('AI_BASE_URL'),
   imgGenModel: getEnv('IMG_GEN_MODEL') || getEnv('AI_MODEL'),
@@ -83,11 +88,11 @@ Output MUST be a strict JSON object with keys "english" and "chinese".
 `;
 
 const generateWithGemini = async (file: File, base64Data: string): Promise<AnalysisResult> => {
-  const ai = new GoogleGenAI({ 
+  const ai = new GoogleGenAI({
     apiKey: config.apiKey!,
-    baseUrl: config.baseUrl
+    httpOptions: config.baseUrl ? { baseUrl: config.baseUrl } : undefined
   });
-  
+
   const modelName = config.model || 'gemini-2.5-flash';
   
   const imagePart = {
@@ -189,7 +194,7 @@ const generateWithOpenAI = async (file: File, base64Data: string): Promise<Analy
 export const generateImage = async (prompt: string, options: ImageGenerationOptions): Promise<string> => {
   // Use Image Gen specific API Key if available, otherwise main key
   const apiKey = config.imgGenApiKey;
-  
+
   if (!apiKey) {
     throw new Error("未配置画图 API KEY (VITE_IMG_GEN_API_KEY 或 VITE_API_KEY)。请检查 .env 配置。");
   }
@@ -199,23 +204,24 @@ export const generateImage = async (prompt: string, options: ImageGenerationOpti
     fullPrompt = `${prompt}, art style: ${options.style}, high quality, detailed`;
   }
 
-  // Determine Provider based on Selected Model from Env or Options
-  // If options.model is passed from UI, use it. Otherwise use config.imgGenModel. 
-  const selectedModel = (options.model || config.imgGenModel || 'gemini-2.5-flash-image').toLowerCase();
-  
-  const isOpenAI = selectedModel.includes('dall') || selectedModel.includes('gpt');
+  // Use the provider configuration instead of detecting from model name
+  // This allows third-party APIs with custom model names
+  const provider = config.imgGenProvider;
 
-  if (isOpenAI) {
+  if (provider === 'openai') {
     return generateImageWithOpenAI(fullPrompt, options, apiKey);
-  } else {
+  } else if (provider === 'gemini') {
     return generateImageWithGemini(fullPrompt, options, apiKey);
+  } else {
+    throw new Error(`不支持的画图提供商: ${provider}。目前支持 'gemini' 或 'openai'。`);
   }
 };
 
 const generateImageWithGemini = async (prompt: string, options: ImageGenerationOptions, apiKey: string): Promise<string> => {
-    const ai = new GoogleGenAI({ 
+    const baseUrlToUse = config.imgGenBaseUrl || config.baseUrl;
+    const ai = new GoogleGenAI({
         apiKey: apiKey,
-        baseUrl: config.imgGenBaseUrl || config.baseUrl // Use ImgGen Base URL if set
+        httpOptions: baseUrlToUse ? { baseUrl: baseUrlToUse } : undefined
     });
 
     // Use the specific model from options (dropdown) or env
