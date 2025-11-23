@@ -45,18 +45,47 @@ VITE_AI_PROVIDER=gemini
 VITE_AI_MODEL=gemini-2.5-flash
 
 # [可选] 基础 API 地址 (如需代理)
-# Gemini 默认: https://generativelanguage.googleapis.com
-# OpenAI 默认: https://api.openai.com/v1
+#
+# ⚠️ 重要：请勿在 URL 中包含版本号 (/v1 或 /v1beta)
+#   - OpenAI 的代码会自动添加 /v1 前缀
+#   - Gemini SDK 会自动添加 /v1beta 前缀
+#
+# 支持智能端点重试和特殊符号控制：
+#
+# 【标准模式】（无特殊符号）- 自动添加版本前缀
+#   OpenAI: https://api.example.com → https://api.example.com/v1/chat/completions
+#   Gemini: https://api.example.com → https://api.example.com/v1beta/models/...
+#   示例: VITE_AI_BASE_URL=https://api.openai.com
+#         （不要写成 https://api.openai.com/v1）
+#
+# 【/ 结尾】跳过版本前缀（适用于不需要 /v1 的第三方 API）
+#   OpenAI: https://open.cherryin.net/ → https://open.cherryin.net/chat/completions
+#   Gemini: https://api.example.com/ → https://api.example.com/models/...
+#   示例: VITE_AI_BASE_URL=https://open.cherryin.net/
+#
+# 【# 结尾】强制使用精确地址（不做任何拼接）
+#   直接使用该地址，不添加任何路径
+#   示例: VITE_AI_BASE_URL=https://api.example.com/custom/endpoint#
+#
+# OpenAI 官方默认值: https://api.openai.com
+# Gemini 官方默认值: https://generativelanguage.googleapis.com
 VITE_AI_BASE_URL=
 
 # ==============================================
 # AI 绘画专用配置 (如果不填，默认使用基础配置)
 # ==============================================
 
+# [可选] 绘画专用 AI 提供商 (gemini 或 openai)
+# 重要：此配置用于画图功能的智能路由，避免通过模型名称判断提供商
+# 支持第三方 API，如果使用自定义模型名称，必须明确指定提供商
+VITE_IMG_GEN_PROVIDER=
+
 # [可选] 绘画专用 API Key
 VITE_IMG_GEN_API_KEY=
 
 # [可选] 绘画专用 Base URL
+# ⚠️ 同样不要包含 /v1 或 /v1beta，代码会自动添加
+# 支持相同的特殊符号控制（/, #），规则同上
 VITE_IMG_GEN_BASE_URL=
 
 # [可选] 绘画模型名称

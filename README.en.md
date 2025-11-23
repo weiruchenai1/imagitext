@@ -45,18 +45,47 @@ VITE_AI_PROVIDER=gemini
 VITE_AI_MODEL=gemini-2.5-flash
 
 # [OPTIONAL] Base API URL (for proxies)
-# Gemini Default: https://generativelanguage.googleapis.com
-# OpenAI Default: https://api.openai.com/v1
+#
+# ⚠️ IMPORTANT: Do NOT include version numbers (/v1 or /v1beta) in the URL
+#   - The code automatically adds /v1 prefix for OpenAI
+#   - Gemini SDK automatically adds /v1beta prefix
+#
+# Supports intelligent endpoint retry and special suffix controls:
+#
+# 【Standard Mode】(No special suffix) - Auto-add version prefix
+#   OpenAI: https://api.example.com → https://api.example.com/v1/chat/completions
+#   Gemini: https://api.example.com → https://api.example.com/v1beta/models/...
+#   Example: VITE_AI_BASE_URL=https://api.openai.com
+#            (Do NOT write https://api.openai.com/v1)
+#
+# 【/ Suffix】Skip version prefix (for third-party APIs that don't need /v1)
+#   OpenAI: https://open.cherryin.net/ → https://open.cherryin.net/chat/completions
+#   Gemini: https://api.example.com/ → https://api.example.com/models/...
+#   Example: VITE_AI_BASE_URL=https://open.cherryin.net/
+#
+# 【# Suffix】Force exact URL (no path appending)
+#   Uses the URL as-is without any modifications
+#   Example: VITE_AI_BASE_URL=https://api.example.com/custom/endpoint#
+#
+# OpenAI Official Default: https://api.openai.com
+# Gemini Official Default: https://generativelanguage.googleapis.com
 VITE_AI_BASE_URL=
 
 # ==============================================
-# AI Painting Specific Configuration
+# AI Painting Specific Configuration (fallback to base config if not set)
 # ==============================================
+
+# [OPTIONAL] Dedicated AI Provider for Image Generation (gemini or openai)
+# Important: This enables intelligent routing for image generation, avoiding provider detection by model name
+# Supports third-party APIs - must explicitly specify provider when using custom model names
+VITE_IMG_GEN_PROVIDER=
 
 # [OPTIONAL] Dedicated Image Gen API Key
 VITE_IMG_GEN_API_KEY=
 
 # [OPTIONAL] Dedicated Image Gen Base URL
+# ⚠️ Same rule: Do NOT include /v1 or /v1beta, code will auto-add them
+# Supports same special suffix controls (/, #) as above
 VITE_IMG_GEN_BASE_URL=
 
 # [OPTIONAL] Image Gen Model Name
