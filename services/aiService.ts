@@ -69,6 +69,41 @@ const fileToBase64 = async (file: File): Promise<string> => {
   });
 };
 
+/**
+ * Parse baseUrl with special suffix handling
+ * @param baseUrl - The base URL to parse
+ * @returns Parsed URL info with control flags
+ */
+interface ParsedUrl {
+  forceExact: boolean;     // # suffix: use exact URL without modification
+  ignoreVersion: boolean;  // / suffix: ignore version, prefer alternative endpoints
+  cleanUrl: string;        // Cleaned URL without special suffixes
+}
+
+const parseBaseUrl = (baseUrl: string | undefined): ParsedUrl => {
+  if (!baseUrl) {
+    return { forceExact: false, ignoreVersion: false, cleanUrl: '' };
+  }
+
+  let forceExact = false;
+  let ignoreVersion = false;
+  let cleanUrl = baseUrl;
+
+  if (baseUrl.endsWith('#')) {
+    // # suffix: force exact URL, no endpoint appending
+    forceExact = true;
+    cleanUrl = baseUrl.slice(0, -1).replace(/\/+$/, '');
+  } else if (baseUrl.endsWith('/')) {
+    // / suffix: ignore version, prefer alternative endpoints
+    ignoreVersion = true;
+    cleanUrl = baseUrl.replace(/\/+$/, '');
+  } else {
+    cleanUrl = baseUrl.replace(/\/+$/, '');
+  }
+
+  return { forceExact, ignoreVersion, cleanUrl };
+};
+
 const SYSTEM_PROMPT = `
 Act as an expert prompt engineer for AI image generators like Midjourney, Stable Diffusion, and DALL-E 3. 
 Analyze the uploaded image in extreme detail. 
@@ -88,13 +123,18 @@ Output MUST be a strict JSON object with keys "english" and "chinese".
 `;
 
 const generateWithGemini = async (file: File, base64Data: string): Promise<AnalysisResult> => {
+  const parsed = parseBaseUrl(config.baseUrl);
+  const modelName = config.model || 'gemini-2.5-flash';
+
+  // For Gemini SDK, we can only set httpOptions.baseUrl
+  // The # suffix makes sense for forcing exact URL, but SDK still appends model path
+  const httpOptions = parsed.cleanUrl ? { baseUrl: parsed.cleanUrl } : undefined;
+
   const ai = new GoogleGenAI({
     apiKey: config.apiKey!,
-    httpOptions: config.baseUrl ? { baseUrl: config.baseUrl } : undefined
+    httpOptions
   });
 
-  const modelName = config.model || 'gemini-2.5-flash';
-  
   const imagePart = {
     inlineData: {
       data: base64Data,
@@ -130,18 +170,15 @@ const generateWithGemini = async (file: File, base64Data: string): Promise<Analy
   } catch (error: any) {
     console.error("Gemini API Error:", error);
     handleError(error, "Gemini");
-    throw error; 
+    throw error;
   }
 };
 
 const generateWithOpenAI = async (file: File, base64Data: string): Promise<AnalysisResult> => {
   const modelName = config.model || 'gpt-4o';
-  let url = config.baseUrl || 'https://api.openai.com/v1';
-  
-  if (!url.endsWith('/chat/completions')) {
-      url = `${url.replace(/\/+$/, '')}/chat/completions`;
-  }
-  
+  const parsed = parseBaseUrl(config.baseUrl);
+  const defaultBaseUrl = 'https://api.openai.com';
+
   const payload = {
     model: modelName,
     messages: [
@@ -165,30 +202,64 @@ const generateWithOpenAI = async (file: File, base64Data: string): Promise<Analy
     response_format: { type: "json_object" }
   };
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      await handleHttpError(response, "OpenAI");
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (!content) throw new Error("API 返回了空内容");
-    
-    return JSON.parse(content) as AnalysisResult;
-  } catch (error: any) {
-    console.error("OpenAI API Error:", error);
-    throw error;
+  // If force exact URL, use it directly
+  if (parsed.forceExact && parsed.cleanUrl) {
+    return await tryOpenAIVisionRequest(parsed.cleanUrl, payload, config.apiKey!);
   }
+
+  // Build endpoints to try
+  const baseUrl = parsed.cleanUrl || defaultBaseUrl;
+  const endpointsToTry: string[] = [];
+
+  if (parsed.ignoreVersion) {
+    // / suffix: skip version prefix, try endpoints directly
+    endpointsToTry.push(`${baseUrl}/chat/completions`);
+  } else {
+    // Standard: auto-add /v1 version prefix
+    endpointsToTry.push(`${baseUrl}/v1/chat/completions`);
+    // Fallback: try without version in case API doesn't need it
+    endpointsToTry.push(`${baseUrl}/chat/completions`);
+  }
+
+  // Try each endpoint
+  let lastError: any = null;
+  for (let i = 0; i < endpointsToTry.length; i++) {
+    const endpoint = endpointsToTry[i];
+    try {
+      console.log(`尝试 OpenAI 分析端点 ${i + 1}/${endpointsToTry.length}: ${endpoint}`);
+      return await tryOpenAIVisionRequest(endpoint, payload, config.apiKey!);
+    } catch (error: any) {
+      console.warn(`端点 ${endpoint} 失败:`, error.message);
+      lastError = error;
+    }
+  }
+
+  console.error("OpenAI API Error: 所有端点都失败");
+  throw lastError || new Error("所有 OpenAI 端点都失败");
+};
+
+// Helper function for OpenAI vision requests
+const tryOpenAIVisionRequest = async (url: string, payload: any, apiKey: string): Promise<AnalysisResult> => {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error?.message || `请求失败: ${response.status} ${response.statusText}`);
+  }
+
+  const data = await response.json();
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) throw new Error("API 返回了空内容");
+
+  return JSON.parse(content) as AnalysisResult;
 };
 
 export const generateImage = async (prompt: string, options: ImageGenerationOptions): Promise<string> => {
@@ -219,14 +290,19 @@ export const generateImage = async (prompt: string, options: ImageGenerationOpti
 
 const generateImageWithGemini = async (prompt: string, options: ImageGenerationOptions, apiKey: string): Promise<string> => {
     const baseUrlToUse = config.imgGenBaseUrl || config.baseUrl;
+    const parsed = parseBaseUrl(baseUrlToUse);
+
+    // For Gemini SDK, use parsed cleanUrl
+    const httpOptions = parsed.cleanUrl ? { baseUrl: parsed.cleanUrl } : undefined;
+
     const ai = new GoogleGenAI({
         apiKey: apiKey,
-        httpOptions: baseUrlToUse ? { baseUrl: baseUrlToUse } : undefined
+        httpOptions
     });
 
     // Use the specific model from options (dropdown) or env
     let modelToUse = options.model || config.imgGenModel || 'gemini-2.5-flash-image';
-    
+
     // Fallback for generic names if accidentally passed
     if (modelToUse === 'gemini' || modelToUse === 'gemini-2.5-flash') {
         modelToUse = 'gemini-2.5-flash-image';
@@ -234,7 +310,7 @@ const generateImageWithGemini = async (prompt: string, options: ImageGenerationO
 
     try {
         const parts: any[] = [];
-        
+
         if (options.referenceImage) {
             const base64 = await fileToBase64(options.referenceImage);
             parts.push({
@@ -281,15 +357,13 @@ const generateImageWithGemini = async (prompt: string, options: ImageGenerationO
 };
 
 const generateImageWithOpenAI = async (prompt: string, options: ImageGenerationOptions, apiKey: string): Promise<string> => {
-    let url = config.imgGenBaseUrl || config.baseUrl || 'https://api.openai.com/v1';
-    if (!url.endsWith('/images/generations')) {
-        url = `${url.replace(/\/+$/, '')}/images/generations`;
-    }
+    const baseUrl = config.imgGenBaseUrl || config.baseUrl || 'https://api.openai.com';
+    const parsed = parseBaseUrl(baseUrl);
 
     let size = "1024x1024";
-    if (options.aspectRatio === '16:9') size = "1792x1024"; 
-    if (options.aspectRatio === '9:16') size = "1024x1792"; 
-    
+    if (options.aspectRatio === '16:9') size = "1792x1024";
+    if (options.aspectRatio === '9:16') size = "1024x1792";
+
     const payload = {
         model: options.model || config.imgGenModel || "dall-e-3",
         prompt: prompt,
@@ -298,33 +372,84 @@ const generateImageWithOpenAI = async (prompt: string, options: ImageGenerationO
         response_format: "b64_json"
     };
 
-    try {
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            body: JSON.stringify(payload)
-        });
-
-        if (!response.ok) {
-            await handleHttpError(response, "OpenAI Image");
-        }
-
-        const data = await response.json();
-        const b64 = data.data?.[0]?.b64_json;
-        if (b64) {
-            return `data:image/png;base64,${b64}`;
-        }
-        const imgUrl = data.data?.[0]?.url;
-        if (imgUrl) return imgUrl;
-
-        throw new Error("未生成图片数据");
-    } catch (error: any) {
-        console.error("OpenAI Image Gen Error:", error);
-        throw error;
+    // If force exact URL, use it directly
+    if (parsed.forceExact && parsed.cleanUrl) {
+        return await tryGenerateImage(parsed.cleanUrl, payload, apiKey);
     }
+
+    // Build endpoint URLs to try
+    const cleanBaseUrl = parsed.cleanUrl || 'https://api.openai.com';
+    const endpointsToTry: string[] = [];
+
+    if (parsed.ignoreVersion) {
+        // / suffix: skip version prefix, try chat first (common for third-party APIs)
+        endpointsToTry.push(`${cleanBaseUrl}/chat/completions`);
+        endpointsToTry.push(`${cleanBaseUrl}/images/generations`);
+    } else {
+        // Standard: auto-add /v1 prefix, try DALL-E endpoint first, then chat
+        endpointsToTry.push(`${cleanBaseUrl}/v1/images/generations`);
+        endpointsToTry.push(`${cleanBaseUrl}/v1/chat/completions`);
+        // Fallback: try without /v1 prefix
+        endpointsToTry.push(`${cleanBaseUrl}/images/generations`);
+        endpointsToTry.push(`${cleanBaseUrl}/chat/completions`);
+    }
+
+    // Try each endpoint until one succeeds
+    let lastError: any = null;
+    for (let i = 0; i < endpointsToTry.length; i++) {
+        const endpoint = endpointsToTry[i];
+        try {
+            console.log(`尝试 OpenAI 画图端点 ${i + 1}/${endpointsToTry.length}: ${endpoint}`);
+            return await tryGenerateImage(endpoint, payload, apiKey);
+        } catch (error: any) {
+            console.warn(`端点 ${endpoint} 失败:`, error.message);
+            lastError = error;
+            // Continue to next endpoint
+        }
+    }
+
+    // All endpoints failed
+    console.error("OpenAI Image Gen Error: 所有端点都失败");
+    throw lastError || new Error("所有 OpenAI 端点都失败");
+};
+
+// Helper function to try generating image with a specific endpoint
+const tryGenerateImage = async (url: string, payload: any, apiKey: string): Promise<string> => {
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `请求失败: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    // Try to extract image data (supports multiple response formats)
+    const b64 = data.data?.[0]?.b64_json;
+    if (b64) {
+        return `data:image/png;base64,${b64}`;
+    }
+
+    const imgUrl = data.data?.[0]?.url;
+    if (imgUrl) return imgUrl;
+
+    // Some APIs return image in chat completion format
+    const chatContent = data.choices?.[0]?.message?.content;
+    if (chatContent && typeof chatContent === 'string') {
+        // Check if content contains base64 image
+        if (chatContent.startsWith('data:image')) {
+            return chatContent;
+        }
+    }
+
+    throw new Error("未生成图片数据");
 };
 
 const handleError = (error: any, provider: string) => {
