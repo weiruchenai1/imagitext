@@ -1,5 +1,5 @@
 # 后端 Dockerfile
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # 安装依赖
-RUN npm ci --only=production
+RUN npm ci --omit=dev --prefer-offline --no-audit
 
 # 复制源代码
 COPY . .
