@@ -10,7 +10,7 @@ interface AIPaintingProps {
 
 const STORAGE_KEY_PROMPT = 'imagitext_painting_prompt';
 const STORAGE_KEY_RESULT = 'imagitext_painting_result';
-const STORAGE_KEY_SETTINGS = 'imagitext_painting_settings'; // Saves style, ratio, model
+const STORAGE_KEY_SETTINGS = 'imagitext_painting_settings';
 
 const RANDOM_PROMPTS = [
   "A futuristic city floating in the clouds, cyberpunk style, neon lights, 8k resolution",
@@ -38,21 +38,45 @@ export const AIPainting: React.FC<AIPaintingProps> = ({ lang }) => {
   const [isDraggingRef, setIsDraggingRef] = useState(false);
   
   const refInputRef = useRef<HTMLInputElement>(null);
-  
-  // Initialize model options
+
   const [modelOptions, setModelOptions] = useState<{value: string, label: string}[]>([]);
 
   useEffect(() => {
-    // Helper to get env
-    const getEnv = (key: string) => {
-         // @ts-ignore
-         if (typeof import.meta !== 'undefined' && import.meta.env) return import.meta.env[`VITE_${key}`];
-         // @ts-ignore
-         if (typeof process !== 'undefined' && process.env) return process.env[`VITE_${key}`];
-         return null;
+    const loadConfig = async () => {
+      try {
+        const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE_URL}/api/config`);
+
+        if (response.ok) {
+          const config = await response.json();
+          const options = config.models.map((m: string) => ({
+            value: m,
+            label: m
+          }));
+          setModelOptions(options);
+
+          if (!model && options.length > 0) {
+            setModel(options[0].value);
+          }
+        } else {
+          const fallback = [
+            { value: 'gemini-2.5-flash-image-preview', label: 'Gemini 2.5 Flash Image' },
+            { value: 'dall-e-3', label: 'DALL-E 3' }
+          ];
+          setModelOptions(fallback);
+          if (!model) setModel(fallback[0].value);
+        }
+      } catch (error) {
+        console.error('Failed to load config:', error);
+        const fallback = [
+          { value: 'gemini-2.5-flash-image-preview', label: 'Gemini 2.5 Flash Image' },
+          { value: 'dall-e-3', label: 'DALL-E 3' }
+        ];
+        setModelOptions(fallback);
+        if (!model) setModel(fallback[0].value);
+      }
     };
 
-    // 1. Load Persisted Data
     const savedPrompt = localStorage.getItem(STORAGE_KEY_PROMPT);
     const savedResult = localStorage.getItem(STORAGE_KEY_RESULT);
     const savedSettings = localStorage.getItem(STORAGE_KEY_SETTINGS);
@@ -68,37 +92,7 @@ export const AIPainting: React.FC<AIPaintingProps> = ({ lang }) => {
         } catch (e) {}
     }
 
-    // 2. Configure Models
-    const imgGenModelEnv = getEnv('IMG_GEN_MODEL');
-    const options: {value: string, label: string}[] = [];
-    
-    if (imgGenModelEnv) {
-        // Support comma separated models e.g. "dall-e-3,gemini-2.5-flash-image"
-        const models = imgGenModelEnv.split(',');
-        models.forEach(m => {
-            const trimmed = m.trim();
-            if (trimmed) options.push({ value: trimmed, label: trimmed });
-        });
-    }
-    
-    // Fallbacks if nothing parsed
-    if (options.length === 0) {
-        const aiModel = getEnv('AI_MODEL');
-        if (aiModel && (aiModel.includes('image') || aiModel.includes('dall'))) {
-             options.push({ value: aiModel, label: aiModel });
-        } else {
-             options.push({ value: 'gemini-2.5-flash-image', label: 'Gemini 2.5 Flash Image (Default)' });
-        }
-    }
-
-    setModelOptions(options);
-    
-    // Only set default model if we didn't restore one, or if restored one is invalid
-    setModel(prev => {
-        const exists = options.find(o => o.value === prev);
-        return exists ? prev : options[0].value;
-    });
-
+    loadConfig();
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

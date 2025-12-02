@@ -1,0 +1,17 @@
+{
+  "name": "imagitext-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Backend API server for ImagiText",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "multer": "^1.4.5-lts.1"
+  }
+}

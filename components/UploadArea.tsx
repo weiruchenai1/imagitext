@@ -2,14 +2,16 @@
 import React, { useCallback, useState, useRef } from 'react';
 import { UploadType } from '../types';
 import { translations } from '../translations';
+import { generatePromptFromImageUrl } from '../services/aiService';
 
 interface UploadAreaProps {
   onFileSelect: (file: File) => void;
+  onUrlAnalysis: (result: any) => void;
   isLoading: boolean;
   t: typeof translations.zh.upload;
 }
 
-export const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelect, isLoading, t }) => {
+export const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelect, onUrlAnalysis, isLoading, t }) => {
   const [activeTab, setActiveTab] = useState<UploadType>(UploadType.FILE);
   const [isDragging, setIsDragging] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
@@ -63,24 +65,15 @@ export const UploadArea: React.FC<UploadAreaProps> = ({ onFileSelect, isLoading,
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!imageUrl) return;
-    
+
     setUrlError(null);
-    
+
     try {
-        // Attempt to fetch the image
-        const response = await fetch(imageUrl);
-        if (!response.ok) throw new Error('Failed to fetch image');
-        
-        const blob = await response.blob();
-        if (!blob.type.startsWith('image/')) {
-            setUrlError('The URL does not point to a valid image.');
-            return;
-        }
-        
-        const file = new File([blob], "downloaded_image", { type: blob.type });
-        onFileSelect(file);
-    } catch (err) {
-        setUrlError(t.errorImage);
+      // Call backend API to analyze image from URL
+      const result = await generatePromptFromImageUrl(imageUrl);
+      onUrlAnalysis(result);
+    } catch (err: any) {
+      setUrlError(err.message || t.errorImage);
     }
   };
 

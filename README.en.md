@@ -25,97 +25,184 @@
 *   **Multi-Provider Support**: Compatible with Google Gemini and OpenAI (or OpenAI-compatible) APIs.
 *   **AI Painting Support**: Dedicated configuration for Image Generation API (e.g., DALL-E 3) separate from the analysis API.
 *   **Image Link Support**: Analyze images directly from URLs.
+*   **Secure Architecture**: Backend API proxy protects API keys from frontend exposure.
 
-## Configuration Template (.env)
+## Architecture
 
-Create a file named `.env` in the project root and copy the following content. **Note: Variables must start with VITE_**.
+This project uses a client-server architecture:
 
-```ini
-# ==============================================
-# ImagiText - Configuration
-# ==============================================
+- **Frontend**: React + Vite application (port 3000)
+- **Backend**: Express API server (port 3001)
 
-# [REQUIRED] Base API Key (for Image to Prompt)
-VITE_API_KEY=your_api_key_here
+The backend server manages all AI API keys, and the frontend calls AI services through the backend proxy to ensure key security.
 
-# [OPTIONAL] AI Provider (gemini or openai)
-VITE_AI_PROVIDER=gemini
+## Quick Start
 
-# [OPTIONAL] Base Model Name (for analysis)
-VITE_AI_MODEL=gemini-2.5-flash
+### 1. Install Dependencies
 
-# [OPTIONAL] Base API URL (for proxies)
-#
-# ⚠️ IMPORTANT: Do NOT include version numbers (/v1 or /v1beta) in the URL
-#   - The code automatically adds /v1 prefix for OpenAI
-#   - Gemini SDK automatically adds /v1beta prefix
-#
-# Supports intelligent endpoint retry and special suffix controls:
-#
-# 【Standard Mode】(No special suffix) - Auto-add version prefix
-#   OpenAI: https://api.example.com → https://api.example.com/v1/chat/completions
-#   Gemini: https://api.example.com → https://api.example.com/v1beta/models/...
-#   Example: VITE_AI_BASE_URL=https://api.openai.com
-#            (Do NOT write https://api.openai.com/v1)
-#
-# 【/ Suffix】Skip version prefix (for third-party APIs that don't need /v1)
-#   OpenAI: https://open.cherryin.net/ → https://open.cherryin.net/chat/completions
-#   Gemini: https://api.example.com/ → https://api.example.com/models/...
-#   Example: VITE_AI_BASE_URL=https://open.cherryin.net/
-#
-# 【# Suffix】Force exact URL (no path appending)
-#   Uses the URL as-is without any modifications
-#   Example: VITE_AI_BASE_URL=https://api.example.com/custom/endpoint#
-#
-# OpenAI Official Default: https://api.openai.com
-# Gemini Official Default: https://generativelanguage.googleapis.com
-VITE_AI_BASE_URL=
+```bash
+# Install frontend dependencies
+npm install
 
-# ==============================================
-# AI Painting Specific Configuration (fallback to base config if not set)
-# ==============================================
-
-# [OPTIONAL] Dedicated AI Provider for Image Generation (gemini or openai)
-# Important: This enables intelligent routing for image generation, avoiding provider detection by model name
-# Supports third-party APIs - must explicitly specify provider when using custom model names
-VITE_IMG_GEN_PROVIDER=
-
-# [OPTIONAL] Dedicated Image Gen API Key
-VITE_IMG_GEN_API_KEY=
-
-# [OPTIONAL] Dedicated Image Gen Base URL
-# ⚠️ Same rule: Do NOT include /v1 or /v1beta, code will auto-add them
-# Supports same special suffix controls (/, #) as above
-VITE_IMG_GEN_BASE_URL=
-
-# [OPTIONAL] Image Gen Model Name
-# This will appear in the "Select Model" dropdown.
-# Supports comma-separated values for multiple models.
-# Example: VITE_IMG_GEN_MODEL=gemini-2.5-flash-image,dall-e-3,flux-pro
-VITE_IMG_GEN_MODEL=gemini-2.5-flash-image
+# Install backend dependencies
+cd server
+npm install
+cd ..
 ```
 
-## Deployment
+### 2. Configure Environment Variables
 
-### 1. Static Hosting
+#### Frontend Configuration (`.env`)
 
-1.  **Install**: `npm install`
-2.  **Build**: `npm run build`
-3.  **Deploy**: Upload the `dist` folder.
-4.  **Environment Variables**: Add variables starting with `VITE_` in your hosting dashboard.
+Create `.env` file in project root:
 
-### 2. Vercel Deployment
+```ini
+# Frontend Configuration
+VITE_API_URL=http://localhost:3001
+```
 
-**One-Click Deploy:**
+#### Backend Configuration (`server/.env`)
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/weiruchenai1/imagitext&project-name=imagitext)
+Create `.env` file in `server/` directory:
+
+```ini
+# Backend API Configuration
+
+# Server Port
+PORT=3001
+
+# Image Analysis API Configuration
+API_KEY=your_gemini_or_openai_api_key
+AI_PROVIDER=gemini
+AI_MODEL=gemini-2.5-flash
+AI_BASE_URL=
+
+# Image Generation API Configuration
+IMG_GEN_PROVIDER=gemini
+IMG_GEN_API_KEY=your_image_generation_api_key
+IMG_GEN_BASE_URL=
+IMG_GEN_MODEL=gemini-2.5-flash-image-preview
+
+# CORS Configuration (Frontend URL)
+CORS_ORIGIN=http://localhost:3000
+```
+
+### 3. Start Services
+
+Open two terminal windows:
+
+**Terminal 1 - Start backend server:**
+```bash
+cd server
+npm start
+```
+
+**Terminal 2 - Start frontend dev server:**
+```bash
+npm run dev
+```
+
+Visit `http://localhost:3000` to use the application.
+
+## Get API Keys
+
+- **Google Gemini**: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- **OpenAI**: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+
+## Deployment Guide
+
+### Local Deployment
+
+Follow the "Quick Start" steps to run locally.
+
+### Production Deployment
+
+#### Option 1: Separate Deployment
+
+1. **Frontend** (Vercel/Netlify/Cloudflare Pages):
+   ```bash
+   npm install
+   npm run build
+   # Upload dist/ directory
+   ```
+   Environment variable: `VITE_API_URL=https://your-backend-api.com`
+
+2. **Backend** (Any Node.js hosting service):
+   ```bash
+   cd server
+   npm install
+   npm start
+   ```
+   Configure all environment variables in `server/.env`.
+
+#### Option 2: Same Server Deployment
+
+Using Nginx reverse proxy:
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # Frontend static files
+    location / {
+        root /path/to/dist;
+        try_files $uri /index.html;
+    }
+
+    # Backend API proxy
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+Frontend environment variable: `VITE_API_URL=/api`
 
 ## Tech Stack
 
+### Frontend
 *   React 19
 *   TypeScript
+*   Vite
 *   Tailwind CSS
+
+### Backend
+*   Node.js + Express
 *   Google GenAI SDK
+*   Multer (file upload)
+*   CORS
+
+## Development
+
+```bash
+# Frontend dev (hot reload)
+npm run dev
+
+# Backend dev (auto restart)
+cd server
+npm run dev
+```
+
+## Build
+
+```bash
+# Build frontend
+npm run build
+
+# Preview build
+npm run preview
+```
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
 
 ---
+
 &copy; 2025 ImagiText

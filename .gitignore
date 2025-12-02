@@ -11,11 +11,14 @@ node_modules
 dist
 dist-ssr
 *.local
-*.env
+
+# Upload directories
+server/uploads/
+.claude/
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.env
+.vscode/
 .idea
 .DS_Store
 *.suo

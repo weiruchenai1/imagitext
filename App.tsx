@@ -9,21 +9,9 @@ import { generatePromptFromImage } from './services/aiService';
 import { AnalysisResult, Language, View } from './types';
 import { translations } from './translations';
 
-// Keys for localStorage
 const STORAGE_KEY_RESULT = 'imagitext_analysis_result';
-const STORAGE_KEY_IMAGE = 'imagitext_uploaded_image';
 const STORAGE_KEY_THEME = 'imagitext_theme';
 const STORAGE_KEY_LANGUAGE = 'imagitext_language';
-
-// Helper to convert File to Base64 for storage
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-  });
-};
 
 // Detect system color scheme preference
 const getSystemTheme = (): boolean => {
@@ -66,29 +54,22 @@ function App() {
 
   const t = translations[lang];
 
-  // Helper to get env var safely for UI display
-  const getProviderName = () => {
-    // @ts-ignore
-    const provider = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_AI_PROVIDER) 
-      // @ts-ignore
-      ? import.meta.env.VITE_AI_PROVIDER 
-      : (typeof process !== 'undefined' && process.env ? (process.env.VITE_AI_PROVIDER || process.env.AI_PROVIDER) : 'gemini');
-      
-    return provider?.toLowerCase() === 'openai' ? 'OpenAI Models' : 'Gemini Models';
-  }
-
-  // Load Persisted Data on Mount
   useEffect(() => {
     try {
       const savedResult = localStorage.getItem(STORAGE_KEY_RESULT);
-      const savedImage = localStorage.getItem(STORAGE_KEY_IMAGE);
-
-      if (savedResult && savedImage) {
-        setPromptResult(JSON.parse(savedResult));
-        setSavedImageUrl(savedImage);
+      if (savedResult) {
+        const parsed = JSON.parse(savedResult);
+        // Validate data format - ensure it has the expected structure
+        if (parsed && typeof parsed.english === 'string' && typeof parsed.chinese === 'string') {
+          setPromptResult(parsed);
+        } else {
+          // Clear invalid old data
+          localStorage.removeItem(STORAGE_KEY_RESULT);
+        }
       }
     } catch (e) {
       console.error("Failed to load persisted data", e);
+      localStorage.removeItem(STORAGE_KEY_RESULT);
     }
   }, []);
 
@@ -115,22 +96,19 @@ function App() {
 
   const handleFileSelect = async (file: File) => {
     setUploadedFile(file);
-    setSavedImageUrl(null); // Reset saved image when new file is selected
+    setSavedImageUrl(null);
     setIsLoading(true);
     setError(null);
     setPromptResult(null);
 
     try {
-      // Convert to base64 for storage
-      const base64Image = await fileToBase64(file);
-      
       const result = await generatePromptFromImage(file);
       setPromptResult(result);
 
-      // Save to LocalStorage
       localStorage.setItem(STORAGE_KEY_RESULT, JSON.stringify(result));
-      localStorage.setItem(STORAGE_KEY_IMAGE, base64Image);
-      setSavedImageUrl(base64Image);
+
+      const imageUrl = URL.createObjectURL(file);
+      setSavedImageUrl(imageUrl);
 
     } catch (err: any) {
       const errorMessage = err instanceof Error ? err.message : t.app.unknownError;
@@ -141,14 +119,19 @@ function App() {
     }
   };
 
+  const handleUrlAnalysis = async (result: AnalysisResult) => {
+    setUploadedFile(null);
+    setSavedImageUrl(null);
+    setPromptResult(result);
+    localStorage.setItem(STORAGE_KEY_RESULT, JSON.stringify(result));
+  };
+
   const handleReset = () => {
     setUploadedFile(null);
     setPromptResult(null);
     setSavedImageUrl(null);
     setError(null);
-    // Clear LocalStorage
     localStorage.removeItem(STORAGE_KEY_RESULT);
-    localStorage.removeItem(STORAGE_KEY_IMAGE);
   };
 
   return (
@@ -199,9 +182,10 @@ function App() {
                         </p>
                     </div>
 
-                     <UploadArea 
-                        onFileSelect={handleFileSelect} 
-                        isLoading={isLoading} 
+                     <UploadArea
+                        onFileSelect={handleFileSelect}
+                        onUrlAnalysis={handleUrlAnalysis}
+                        isLoading={isLoading}
                         t={t.upload}
                      />
                      
@@ -250,7 +234,7 @@ function App() {
 
         <footer className="mt-16 text-center px-6">
             <p className="text-xs text-slate-400 dark:text-slate-500">
-                {t.app.poweredBy} {getProviderName()}
+                {t.app.poweredBy} AI Models
             </p>
             <p className="text-xs text-slate-300 dark:text-slate-600 mt-2">
                 &copy; {new Date().getFullYear()} ImagiText. {t.app.rights}

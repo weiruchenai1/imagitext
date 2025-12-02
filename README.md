@@ -25,100 +25,184 @@
 *   **多模型支持**：兼容 Google Gemini 和 OpenAI（及兼容 OpenAI 格式）的 API。
 *   **AI 绘画支持**：可配置专门的绘画 API（如 DALL-E 3 或 Gemini Image Gen），与分析 API 分离。
 *   **图片链接支持**：直接通过 URL 分析网络图片。
+*   **安全架构**：后端 API 代理保护 API 密钥，避免前端暴露。
 
-## 配置文件模板 (.env)
+## 架构说明
 
-请在项目根目录下创建一个名为 `.env` 的文件，并复制以下内容（**注意变量名必须以 VITE_ 开头**）：
+本项目采用前后端分离架构：
+
+- **前端**：React + Vite 应用（端口 3000）
+- **后端**：Express API 服务（端口 3001）
+
+后端服务管理所有 AI API 密钥，前端通过后端代理调用 AI 服务，确保密钥安全。
+
+## 快速开始
+
+### 1. 安装依赖
+
+```bash
+# 安装前端依赖
+npm install
+
+# 安装后端依赖
+cd server
+npm install
+cd ..
+```
+
+### 2. 配置环境变量
+
+#### 前端配置 (`.env`)
+
+在项目根目录创建 `.env` 文件：
 
 ```ini
-# ==============================================
-# ImagiText - 配置文件
-# ==============================================
-
-# [必须] 基础 API 密钥 (用于图片转提示词)
-VITE_API_KEY=your_api_key_here
-
-# [可选] AI 提供商 (gemini 或 openai)
-VITE_AI_PROVIDER=gemini
-
-# [可选] 基础模型名称 (用于分析图片)
-VITE_AI_MODEL=gemini-2.5-flash
-
-# [可选] 基础 API 地址 (如需代理)
-#
-# ⚠️ 重要：请勿在 URL 中包含版本号 (/v1 或 /v1beta)
-#   - OpenAI 的代码会自动添加 /v1 前缀
-#   - Gemini SDK 会自动添加 /v1beta 前缀
-#
-# 支持智能端点重试和特殊符号控制：
-#
-# 【标准模式】（无特殊符号）- 自动添加版本前缀
-#   OpenAI: https://api.example.com → https://api.example.com/v1/chat/completions
-#   Gemini: https://api.example.com → https://api.example.com/v1beta/models/...
-#   示例: VITE_AI_BASE_URL=https://api.openai.com
-#         （不要写成 https://api.openai.com/v1）
-#
-# 【/ 结尾】跳过版本前缀（适用于不需要 /v1 的第三方 API）
-#   OpenAI: https://open.cherryin.net/ → https://open.cherryin.net/chat/completions
-#   Gemini: https://api.example.com/ → https://api.example.com/models/...
-#   示例: VITE_AI_BASE_URL=https://open.cherryin.net/
-#
-# 【# 结尾】强制使用精确地址（不做任何拼接）
-#   直接使用该地址，不添加任何路径
-#   示例: VITE_AI_BASE_URL=https://api.example.com/custom/endpoint#
-#
-# OpenAI 官方默认值: https://api.openai.com
-# Gemini 官方默认值: https://generativelanguage.googleapis.com
-VITE_AI_BASE_URL=
-
-# ==============================================
-# AI 绘画专用配置 (如果不填，默认使用基础配置)
-# ==============================================
-
-# [可选] 绘画专用 AI 提供商 (gemini 或 openai)
-# 重要：此配置用于画图功能的智能路由，避免通过模型名称判断提供商
-# 支持第三方 API，如果使用自定义模型名称，必须明确指定提供商
-VITE_IMG_GEN_PROVIDER=
-
-# [可选] 绘画专用 API Key
-VITE_IMG_GEN_API_KEY=
-
-# [可选] 绘画专用 Base URL
-# ⚠️ 同样不要包含 /v1 或 /v1beta，代码会自动添加
-# 支持相同的特殊符号控制（/, #），规则同上
-VITE_IMG_GEN_BASE_URL=
-
-# [可选] 绘画模型名称
-# 此时页面上的"选择模型"下拉菜单将优先显示此模型。
-# 支持配置多个模型（用逗号分隔），第一个为默认模型。
-# 示例: VITE_IMG_GEN_MODEL=gemini-2.5-flash-image,dall-e-3,flux-pro
-VITE_IMG_GEN_MODEL=gemini-2.5-flash-image
+# Frontend Configuration
+VITE_API_URL=http://localhost:3001
 ```
+
+#### 后端配置 (`server/.env`)
+
+在 `server/` 目录创建 `.env` 文件：
+
+```ini
+# Backend API Configuration
+
+# Server Port
+PORT=3001
+
+# Image Analysis API Configuration
+API_KEY=your_gemini_or_openai_api_key
+AI_PROVIDER=gemini
+AI_MODEL=gemini-2.5-flash
+AI_BASE_URL=
+
+# Image Generation API Configuration
+IMG_GEN_PROVIDER=gemini
+IMG_GEN_API_KEY=your_image_generation_api_key
+IMG_GEN_BASE_URL=
+IMG_GEN_MODEL=gemini-2.5-flash-image-preview
+
+# CORS Configuration (Frontend URL)
+CORS_ORIGIN=http://localhost:3000
+```
+
+### 3. 启动服务
+
+开启两个终端窗口：
+
+**终端 1 - 启动后端服务：**
+```bash
+cd server
+npm start
+```
+
+**终端 2 - 启动前端开发服务器：**
+```bash
+npm run dev
+```
+
+访问 `http://localhost:3000` 即可使用。
+
+## API 密钥获取
+
+- **Google Gemini**: [https://aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- **OpenAI**: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 
 ## 部署指南
 
-### 1. 静态托管 (Vercel, Netlify, Cloudflare Pages)
+### 本地部署
 
-这是一个基于 Vite/ESBuild 构建的纯客户端 React 应用。
+按照"快速开始"步骤即可在本地运行。
 
-1.  **克隆仓库**。
-2.  **安装依赖**：`npm install`
-3.  **构建**：`npm run build`
-4.  **部署**：将 `dist` 文件夹上传到你的静态托管服务。
-5.  **环境变量**：确保在托管平台的控制面板中添加 `VITE_API_KEY` 和其他相关环境变量。
+### 生产部署
 
-### 2. Vercel 部署
+#### 方案 1：分离部署
 
-**一键部署：**
+1. **前端部署**（Vercel/Netlify/Cloudflare Pages）：
+   ```bash
+   npm install
+   npm run build
+   # 上传 dist/ 目录
+   ```
+   环境变量：`VITE_API_URL=https://your-backend-api.com`
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/weiruchenai1/imagitext&project-name=imagitext)
+2. **后端部署**（任何支持 Node.js 的服务器）：
+   ```bash
+   cd server
+   npm install
+   npm start
+   ```
+   配置好 `server/.env` 文件中的所有环境变量。
+
+#### 方案 2：同服务器部署
+
+使用 Nginx 反向代理：
+
+```nginx
+server {
+    listen 80;
+    server_name your-domain.com;
+
+    # 前端静态文件
+    location / {
+        root /path/to/dist;
+        try_files $uri /index.html;
+    }
+
+    # 后端 API 代理
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+前端环境变量设置为：`VITE_API_URL=/api`
 
 ## 技术栈
 
+### 前端
 *   React 19
 *   TypeScript
+*   Vite
 *   Tailwind CSS
+
+### 后端
+*   Node.js + Express
 *   Google GenAI SDK
+*   Multer (文件上传)
+*   CORS
+
+## 开发
+
+```bash
+# 前端开发（热重载）
+npm run dev
+
+# 后端开发（自动重启）
+cd server
+npm run dev
+```
+
+## 构建
+
+```bash
+# 构建前端
+npm run build
+
+# 预览构建结果
+npm run preview
+```
+
+## License
+
+本项目采用 MIT 许可证。详见 [LICENSE](./LICENSE) 文件。
 
 ---
+
 &copy; 2025 ImagiText
