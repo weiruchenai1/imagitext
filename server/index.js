@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import multer from 'multer';
 import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
 
@@ -516,6 +518,31 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// ============================================
+// 静态文件服务（仅在生产环境）
+// ============================================
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const publicPath = path.join(__dirname, 'public');
+
+// 检查 public 目录是否存在（Docker 部署时会有）
+fs.access(publicPath)
+  .then(() => {
+    console.log('Serving static files from:', publicPath);
+
+    // 提供静态文件
+    app.use(express.static(publicPath));
+
+    // SPA fallback: 所有非 API 路由返回 index.html
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(publicPath, 'index.html'));
+    });
+  })
+  .catch(() => {
+    console.log('Public directory not found. Running in API-only mode.');
+  });
+
 app.listen(PORT, () => {
-  console.log(`ImagiText API server running on http://localhost:${PORT}`);
+  console.log(`ImagiText server running on http://localhost:${PORT}`);
+  console.log(`API endpoints available at http://localhost:${PORT}/api`);
 });
