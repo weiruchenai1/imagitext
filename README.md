@@ -36,9 +36,32 @@
 
 后端服务管理所有 AI API 密钥，前端通过后端代理调用 AI 服务，确保密钥安全。
 
-## 快速开始
+## 🚀 快速部署
 
-### 1. 安装依赖
+### Docker 部署（推荐）
+
+最快的部署方式，使用预构建的 Docker 镜像：
+
+```bash
+# 1. 创建目录并下载配置
+mkdir imagitext && cd imagitext
+wget https://raw.githubusercontent.com/weiruchenai1/imagitext/main/docker-compose.prebuilt.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/weiruchenai1/imagitext/main/.env.example -O .env
+
+# 2. 配置 API 密钥（编辑 .env 文件）
+# API_KEY=your_api_key_here
+
+# 3. 启动服务
+docker-compose up -d
+
+# 4. 访问 http://localhost:3000
+```
+
+📖 详细的 Docker 部署文档：[DOCKER_README.md](./DOCKER_README.md)
+
+### 本地开发
+
+#### 1. 安装依赖
 
 ```bash
 # 安装前端依赖
@@ -50,7 +73,7 @@ npm install
 cd ..
 ```
 
-### 2. 配置环境变量
+#### 2. 配置环境变量
 
 #### 前端配置 (`.env`)
 
@@ -87,7 +110,7 @@ IMG_GEN_MODEL=gemini-2.5-flash-image-preview
 CORS_ORIGIN=http://localhost:3000
 ```
 
-### 3. 启动服务
+#### 3. 启动服务
 
 开启两个终端窗口：
 

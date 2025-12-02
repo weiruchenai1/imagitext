@@ -1,0 +1,47 @@
+# 依赖
+node_modules
+npm-debug.log
+package-lock.json
+
+# 构建产物
+dist
+build
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 测试
+coverage
+*.log
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 文档
+README.md
+LICENSE
+*.md
+
+# 其他
+.claude
+server/uploads
+uploads

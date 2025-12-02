@@ -36,9 +36,32 @@ This project uses a client-server architecture:
 
 The backend server manages all AI API keys, and the frontend calls AI services through the backend proxy to ensure key security.
 
-## Quick Start
+## 🚀 Quick Deployment
 
-### 1. Install Dependencies
+### Docker Deployment (Recommended)
+
+The fastest way to deploy using pre-built Docker images:
+
+```bash
+# 1. Create directory and download configs
+mkdir imagitext && cd imagitext
+wget https://raw.githubusercontent.com/weiruchenai1/imagitext/main/docker-compose.prebuilt.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/weiruchenai1/imagitext/main/.env.example -O .env
+
+# 2. Configure API key (edit .env file)
+# API_KEY=your_api_key_here
+
+# 3. Start services
+docker-compose up -d
+
+# 4. Access http://localhost:3000
+```
+
+📖 Detailed Docker deployment guide: [DOCKER_README.md](./DOCKER_README.md)
+
+### Local Development
+
+#### 1. Install Dependencies
 
 ```bash
 # Install frontend dependencies
@@ -50,7 +73,7 @@ npm install
 cd ..
 ```
 
-### 2. Configure Environment Variables
+#### 2. Configure Environment Variables
 
 #### Frontend Configuration (`.env`)
 
@@ -87,7 +110,7 @@ IMG_GEN_MODEL=gemini-2.5-flash-image-preview
 CORS_ORIGIN=http://localhost:3000
 ```
 
-### 3. Start Services
+#### 3. Start Services
 
 Open two terminal windows:
 

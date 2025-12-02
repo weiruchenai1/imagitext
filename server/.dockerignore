@@ -1,0 +1,38 @@
+# 依赖
+node_modules
+npm-debug.log
+package-lock.json
+
+# 环境变量（示例文件保留，实际文件忽略）
+.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志和测试
+*.log
+coverage
+
+# Docker
+Dockerfile
+.dockerignore
+
+# 文档
+README.md
+*.md
+
+# 上传文件（运行时生成）
+uploads/*
+!uploads/.gitkeep

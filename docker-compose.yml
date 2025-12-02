@@ -1,0 +1,70 @@
+version: '3.8'
+
+# 本地构建版本的 docker-compose 配置
+# 用于开发环境或需要自定义构建的场景
+# 如需使用预构建镜像，请使用 docker-compose.prebuilt.yml
+
+services:
+  # 后端 API 服务
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: imagitext-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      # 图片分析 API 配置
+      - API_KEY=${API_KEY}
+      - AI_PROVIDER=${AI_PROVIDER:-gemini}
+      - AI_MODEL=${AI_MODEL:-gemini-2.5-flash}
+      - AI_BASE_URL=${AI_BASE_URL:-}
+      # 图片生成 API 配置
+      - IMG_GEN_PROVIDER=${IMG_GEN_PROVIDER:-gemini}
+      - IMG_GEN_API_KEY=${IMG_GEN_API_KEY:-}
+      - IMG_GEN_BASE_URL=${IMG_GEN_BASE_URL:-}
+      - IMG_GEN_MODEL=${IMG_GEN_MODEL:-gemini-2.5-flash-image-preview}
+      # CORS 配置
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000}
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - imagitext-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # 前端服务
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL:-http://localhost:3001}
+    container_name: imagitext-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - imagitext-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  backend_uploads:
+    driver: local
+
+networks:
+  imagitext-network:
+    driver: bridge
