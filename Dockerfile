@@ -1,15 +1,15 @@
 # 多阶段构建 - 前端 Dockerfile
 
 # 构建阶段
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
 # 复制 package 文件
 COPY package*.json ./
 
-# 安装依赖
-RUN npm ci
+# 安装依赖 (使用 --legacy-peer-deps 避免版本冲突)
+RUN npm ci --legacy-peer-deps --prefer-offline --no-audit
 
 # 复制源代码
 COPY . .
